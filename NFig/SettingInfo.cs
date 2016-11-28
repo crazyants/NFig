@@ -4,6 +4,7 @@ using System.Reflection;
 
 namespace NFig
 {
+#pragma warning disable 1591
     public class SettingInfo<TSubApp, TTier, TDataCenter>
         where TSubApp : struct
         where TTier : struct
@@ -66,4 +67,5 @@ namespace NFig
             return GetDefaultFor(subApp, tier, dataCenter).AllowsOverrides;
         }
     }
+#pragma warning restore 1591
 }

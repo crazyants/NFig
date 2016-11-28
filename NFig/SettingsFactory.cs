@@ -29,7 +29,7 @@ namespace NFig
         readonly Type _dataCenterType;
 
         readonly ISettingEncryptor _encryptor;
-        
+
         readonly ReflectionCache _reflectionCache;
 
         delegate Setting PropertyToSettingDelegate(PropertyInfo pi, SettingAttribute sa, SettingGroup group);
@@ -97,7 +97,8 @@ namespace NFig
                 if (!IsConverterOfType(kvp.Value, kvp.Key))
                 {
                     throw new InvalidSettingConverterException(
-                        $"Cannot use {kvp.Value.GetType().Name} as setting converter for type {kvp.Key.Name}. The converter must implement SettingConverter<{kvp.Key.Name}>.", kvp.Key);
+                        $"Cannot use {kvp.Value.GetType().Name} as setting converter for type {kvp.Key.Name}. The converter must implement SettingConverter<{kvp.Key.Name}>.",
+                        kvp.Key);
                 }
             }
 
@@ -111,7 +112,8 @@ namespace NFig
         }
 
         // todo - might want to look for ways to refactor more of the common pieces between this method and TryGetSettingsBySubApp
-        public InvalidSettingOverridesException TryGetSettingsForGlobalApp(out TSettings settings, [NotNull] OverridesSnapshot<TSubApp, TTier, TDataCenter> snapshot)
+        public InvalidSettingOverridesException TryGetSettingsForGlobalApp(out TSettings settings,
+            [NotNull] OverridesSnapshot<TSubApp, TTier, TDataCenter> snapshot)
         {
             var overrides = snapshot.Overrides;
             var overridesBySubApp = overrides == null ? null : OrganizeSettingValues(overrides, defaultOnly: true);
@@ -129,7 +131,17 @@ namespace NFig
             }
 
             if (exceptions != null)
-                return new InvalidSettingOverridesException(exceptions, new StackTrace(true).ToString());
+            {
+                try
+                {
+                    // throw it so we get a stack trace
+                    throw new InvalidSettingOverridesException(exceptions);
+                }
+                catch (InvalidSettingOverridesException ex)
+                {
+                    return ex;
+                }
+            }
 
             return null;
         }
@@ -165,9 +177,19 @@ namespace NFig
 
                 settingsBySubApp[subApp] = settings;
             }
-            
+
             if (exceptions != null)
-                return new InvalidSettingOverridesException(exceptions, new StackTrace(true).ToString());
+            {
+                try
+                {
+                    // throw it so we get a stack trace
+                    throw new InvalidSettingOverridesException(exceptions);
+                }
+                catch (InvalidSettingOverridesException ex)
+                {
+                    return ex;
+                }
+            }
 
             return null;
         }
@@ -204,7 +226,8 @@ namespace NFig
             }
         }
 
-        public SettingInfo<TSubApp, TTier, TDataCenter>[] GetAllSettingInfos(IEnumerable<SettingValue<TSubApp, TTier, TDataCenter>> overrides = null)
+        public SettingInfo<TSubApp, TTier, TDataCenter>[] GetAllSettingInfos(
+            IEnumerable<SettingValue<TSubApp, TTier, TDataCenter>> overrides = null)
         {
             Dictionary<string, List<SettingValue<TSubApp, TTier, TDataCenter>>> overrideListBySetting = null;
 
@@ -215,7 +238,8 @@ namespace NFig
                 {
                     List<SettingValue<TSubApp, TTier, TDataCenter>> overList;
                     if (!overrideListBySetting.TryGetValue(over.Name, out overList))
-                        overrideListBySetting[over.Name] = overList = new List<SettingValue<TSubApp, TTier, TDataCenter>>();
+                        overrideListBySetting[over.Name] =
+                            overList = new List<SettingValue<TSubApp, TTier, TDataCenter>>();
 
                     overList.Add(over);
                 }
@@ -230,7 +254,8 @@ namespace NFig
                 if (overrideListBySetting == null || !overrideListBySetting.TryGetValue(s.Name, out overList))
                     overList = new List<SettingValue<TSubApp, TTier, TDataCenter>>();
 
-                infos[i] = new SettingInfo<TSubApp, TTier, TDataCenter>(s.Name, s.Description, s.ChangeRequiresRestart, s.IsEncrypted, s.PropertyInfo, s.Defaults, overList);
+                infos[i] = new SettingInfo<TSubApp, TTier, TDataCenter>(s.Name, s.Description, s.ChangeRequiresRestart,
+                    s.IsEncrypted, s.PropertyInfo, s.Defaults, overList);
             }
 
             return infos;
@@ -319,7 +344,8 @@ namespace NFig
         {
             Setting setting;
             if (!_settingsByName.TryGetValue(settingName, out setting))
-                throw new ArgumentException($"No setting named \"{settingName}\" exists on type {_settingsType.FullName}");
+                throw new ArgumentException(
+                    $"No setting named \"{settingName}\" exists on type {_settingsType.FullName}");
 
             return setting.GetValueAsObject(obj);
         }
@@ -328,11 +354,12 @@ namespace NFig
         {
             Setting setting;
             if (!_settingsByName.TryGetValue(settingName, out setting))
-                throw new ArgumentException($"No setting named \"{settingName}\" exists on type {_settingsType.FullName}");
+                throw new ArgumentException(
+                    $"No setting named \"{settingName}\" exists on type {_settingsType.FullName}");
 
             var typedSetting = setting as Setting<TValue>;
             if (typedSetting == null)
-                throw new ArgumentException($"Setting \"{settingName}\" is not of the requested type {typeof (TValue)}");
+                throw new ArgumentException($"Setting \"{settingName}\" is not of the requested type {typeof(TValue)}");
 
             return typedSetting.GetValue(obj);
         }
@@ -357,7 +384,8 @@ namespace NFig
                 foreach (var sa in pi.GetCustomAttributes<SettingAttribute>())
                 {
                     if (!first)
-                        throw new NFigException($"Property {name} has more than one Setting or EncryptedSetting attributes.");
+                        throw new NFigException(
+                            $"Property {name} has more than one Setting or EncryptedSetting attributes.");
 
                     first = false;
 
@@ -386,8 +414,9 @@ namespace NFig
 
                 if (hasGroupAttribute)
                 {
-                    if (!propType.IsClass)
-                        throw new NFigException($"Property {name} is marked with [SettingGroup], but is not a class type.");
+                    if (!propType.IsClass())
+                        throw new NFigException(
+                            $"Property {name} is marked with [SettingGroup], but is not a class type.");
 
                     var subGroup = new SettingGroup(propType, name + ".", group, pi);
                     PopulateSettingsGroup(subGroup);
@@ -423,7 +452,8 @@ namespace NFig
             {
                 // see if there are any default value attributes
                 var rootDefault = isEncrypted ? default(TValue) : sa.DefaultValue;
-                var defaultStringValue = GetStringFromDefaultAndValidate(name, rootDefault, default(TSubApp), default(TDataCenter), converter, isEncrypted);
+                var defaultStringValue = GetStringFromDefaultAndValidate(name, rootDefault, default(TSubApp),
+                    default(TDataCenter), converter, isEncrypted);
 
                 var d = new SettingValue<TSubApp, TTier, TDataCenter>(
                     name,
@@ -451,10 +481,12 @@ namespace NFig
                 if (isEncrypted)
                 {
                     if (Compare.IsDefault(tier))
-                        throw new NFigException($"{name} has a default without a tier. Additional default values for encrypted settings must include a non-\"Any\" tier.");
+                        throw new NFigException(
+                            $"{name} has a default without a tier. Additional default values for encrypted settings must include a non-\"Any\" tier.");
 
                     if (dsvaDefault != null && !(dsvaDefault is string))
-                        throw new NFigException($"{name} has a non-string default. Encrypted defaults must be in string representation.");
+                        throw new NFigException(
+                            $"{name} has a non-string default. Encrypted defaults must be in string representation.");
                 }
 
                 // if it's not the Any tier, and not the current tier, then we don't care about this default
@@ -464,7 +496,8 @@ namespace NFig
                 // However, if the value is encrypted, we only want to perform the validation for the current tier.
                 if (!skip || !isEncrypted)
                 {
-                    var defaultStringValue = GetStringFromDefaultAndValidate(name, dsvaDefault, subApp, dc, converter, isEncrypted);
+                    var defaultStringValue = GetStringFromDefaultAndValidate(name, dsvaDefault, subApp, dc, converter,
+                        isEncrypted);
 
                     // create default
                     var d = new SettingValue<TSubApp, TTier, TDataCenter>(
@@ -481,7 +514,8 @@ namespace NFig
                     foreach (var existing in allDefaults)
                     {
                         if (existing.HasSameSubAppTierDataCenter(d))
-                            throw new NFigException($"Multiple defaults were specified for the same environment ({subApp}/{tier}/{dc}) on setting {name}");
+                            throw new NFigException(
+                                $"Multiple defaults were specified for the same environment ({subApp}/{tier}/{dc}) on setting {name}");
                     }
 
                     allDefaults.Add(d);
@@ -491,7 +525,8 @@ namespace NFig
                 }
             }
 
-            return new Setting<TValue>(name, description, changeRequiresRestart, isEncrypted, pi, group, applicableDefaults.ToArray(), converter, noInline);
+            return new Setting<TValue>(name, description, changeRequiresRestart, isEncrypted, pi, group,
+                applicableDefaults.ToArray(), converter, noInline);
         }
 
         ISettingConverter<TValue> GetConverterForProperty<TValue>(string name, PropertyInfo pi)
@@ -515,16 +550,20 @@ namespace NFig
                 if (!_defaultConverters.TryGetValue(pi.PropertyType, out convObj))
                 {
                     var tValueType = typeof(TValue);
-                    if (tValueType.IsEnum)
+                    if (tValueType.IsEnum())
                     {
-                        if (!tValueType.IsPublic && !tValueType.IsNestedPublic)
-                            throw new InvalidSettingConverterException($"Cannot create converter for enum type \"{tValueType.Name}\" because it is not public.", tValueType);
+                        if (!tValueType.IsPublic() && !tValueType.IsNestedPublic())
+                            throw new InvalidSettingConverterException(
+                                $"Cannot create converter for enum type \"{tValueType.Name}\" because it is not public.",
+                                tValueType);
 
                         convObj = EnumConverters.GetConverter<TValue>();
                     }
                     else
                     {
-                        throw new InvalidSettingConverterException($"No default converter is available for setting \"{name}\" of type {pi.PropertyType.Name}", pi.PropertyType);
+                        throw new InvalidSettingConverterException(
+                            $"No default converter is available for setting \"{name}\" of type {pi.PropertyType.Name}",
+                            pi.PropertyType);
                     }
                 }
             }
@@ -534,7 +573,8 @@ namespace NFig
             if (converter == null)
             {
                 throw new InvalidSettingConverterException(
-                    $"Cannot use {convObj.GetType().Name} as setting converter for \"{name}\". The converter must implement ISettingConverter<{pi.PropertyType.Name}>.", pi.PropertyType);
+                    $"Cannot use {convObj.GetType().Name} as setting converter for \"{name}\". The converter must implement ISettingConverter<{pi.PropertyType.Name}>.",
+                    pi.PropertyType);
             }
 
             return converter;
@@ -543,21 +583,25 @@ namespace NFig
         void AssertValidEncryptedSettingAttribute(string name, SettingAttribute sa)
         {
             if (_encryptor == null)
-                throw new NFigException($"Setting {name} is marked as encrypted, but no ISettingEncryptor was provided to the NFigStore.");
+                throw new NFigException(
+                    $"Setting {name} is marked as encrypted, but no ISettingEncryptor was provided to the NFigStore.");
 
             if (sa.DefaultValue != null)
-                throw new NFigException($"The SettingAttribute for {name} assigns a default value and is marked as encrypted. It cannot have both. " +
-                                        $"This error is probably due to a class inheriting from SettingAttribute without obeying this rule.");
+                throw new NFigException(
+                    $"The SettingAttribute for {name} assigns a default value and is marked as encrypted. It cannot have both. " +
+                    $"This error is probably due to a class inheriting from SettingAttribute without obeying this rule.");
         }
 
-        void GetSubAppTierDataCenterFromAttribute(string name, DefaultSettingValueAttribute dsva, out TSubApp subApp, out TTier tier, out TDataCenter dataCenter)
+        void GetSubAppTierDataCenterFromAttribute(string name, DefaultSettingValueAttribute dsva, out TSubApp subApp,
+            out TTier tier, out TDataCenter dataCenter)
         {
             if (dsva.SubApp != null)
             {
                 if (!(dsva.SubApp is TSubApp))
-                    throw new NFigException($"The subApp argument was not of type {_subAppType.Name} on setting \"{name}\"");
+                    throw new NFigException(
+                        $"The subApp argument was not of type {_subAppType.Name} on setting \"{name}\"");
 
-                subApp = (TSubApp)dsva.SubApp;
+                subApp = (TSubApp) dsva.SubApp;
             }
             else
             {
@@ -569,7 +613,7 @@ namespace NFig
                 if (!(dsva.Tier is TTier))
                     throw new NFigException($"The tier argument was not of type {_tierType.Name} on setting \"{name}\"");
 
-                tier = (TTier)dsva.Tier;
+                tier = (TTier) dsva.Tier;
             }
             else
             {
@@ -579,9 +623,10 @@ namespace NFig
             if (dsva.DataCenter != null)
             {
                 if (!(dsva.DataCenter is TDataCenter))
-                    throw new NFigException($"The dataCenter argument was not of type {_dataCenterType.Name} on setting \"{name}\"");
+                    throw new NFigException(
+                        $"The dataCenter argument was not of type {_dataCenterType.Name} on setting \"{name}\"");
 
-                dataCenter = (TDataCenter)dsva.DataCenter;
+                dataCenter = (TDataCenter) dsva.DataCenter;
             }
             else
             {
@@ -599,7 +644,7 @@ namespace NFig
         {
             string stringValue;
 
-            if (value is string && (isEncrypted || typeof (TValue) != typeof (string)))
+            if (value is string && (isEncrypted || typeof(TValue) != typeof(string)))
             {
                 // Don't need to convert to a string if value is already a string and TValue is not.
                 // We expect that the human essentially already did the conversion.
@@ -611,7 +656,7 @@ namespace NFig
                 try
                 {
                     // try convert the real value into its string representation
-                    var tval = value is TValue ? (TValue)value : (TValue)Convert.ChangeType(value, typeof(TValue));
+                    var tval = value is TValue ? (TValue) value : (TValue) Convert.ChangeType(value, typeof(TValue));
                     stringValue = converter.GetString(tval);
 
                     if (isEncrypted)
@@ -656,14 +701,15 @@ namespace NFig
         /// </summary>
         InitializeSettingsDelegate BuildInitializer(SettingGroup group)
         {
-            var dm = new DynamicMethod("TSettings_Instantiate", _settingsType, new [] { GetType(), _subAppType }, _settingsType.Module, true);
+            var dm = new DynamicMethod("TSettings_Instantiate", _settingsType, new[] {GetType(), _subAppType},
+                _settingsType.Module(), true);
             var il = dm.GetILGenerator();
 
             EmitNewGroupObject(il, group); // [TSettings s]
-            EmitBestDefaults(il);          // [TSettings s]
+            EmitBestDefaults(il); // [TSettings s]
             il.Emit(OpCodes.Ret);
 
-            return (InitializeSettingsDelegate)dm.CreateDelegate(typeof(InitializeSettingsDelegate));
+            return (InitializeSettingsDelegate) dm.CreateDelegate(typeof(InitializeSettingsDelegate));
         }
 
         /// <summary>
@@ -677,14 +723,15 @@ namespace NFig
             // Create a new instance of the group's class.
             var ctor = group.Type.GetConstructor(Type.EmptyTypes);
             if (ctor == null)
-                throw new NFigException($"Cannot use type {group.Type.Name} for settings groups. It does not have a parameterless constructor.");
+                throw new NFigException(
+                    $"Cannot use type {group.Type.Name} for settings groups. It does not have a parameterless constructor.");
 
             il.Emit(OpCodes.Newobj, ctor); // [group]
 
             foreach (var subGroup in group.SettingGroups)
             {
-                il.Emit(OpCodes.Dup);                                       // [group] [group]
-                EmitNewGroupObject(il, subGroup);                           // [group] [group] [sub]
+                il.Emit(OpCodes.Dup); // [group] [group]
+                EmitNewGroupObject(il, subGroup); // [group] [group] [sub]
                 il.Emit(OpCodes.Callvirt, subGroup.PropertyInfo.SetMethod); // [group]
             }
         }
@@ -761,11 +808,11 @@ namespace NFig
                 }
 
                 // emit switch
-                il.Emit(loadSubAppArg);              // [s] [subApp]
+                il.Emit(loadSubAppArg); // [s] [subApp]
                 il.Emit(OpCodes.Ldc_I4, firstValue); // [s] [subApp] [firstValue]
-                il.Emit(OpCodes.Sub);                // [s] [subApp - firstValue]
+                il.Emit(OpCodes.Sub); // [s] [subApp - firstValue]
                 il.Emit(OpCodes.Switch, jumpLabels); // [s]
-                il.Emit(OpCodes.Br, endOfSubApps);   // [s] -- this is the fallthrough case
+                il.Emit(OpCodes.Br, endOfSubApps); // [s] -- this is the fallthrough case
 
                 // emit the case statements
                 for (var i = 0; i < subAppCount; i++)
@@ -773,7 +820,7 @@ namespace NFig
                     il.MarkLabel(subAppLabels[i]);
 
                     var list = bestDefaults[subApps[i]];
-                    EmitDefaultList(il, list);         // [s]
+                    EmitDefaultList(il, list); // [s]
                     il.Emit(OpCodes.Br, endOfSubApps); // [s]
                 }
             }
@@ -785,14 +832,14 @@ namespace NFig
                     var endIfLabel = il.DefineLabel();
 
                     // if (subApp == knownSubApp)
-                    il.Emit(loadSubAppArg);                   // [s] [subApp]
+                    il.Emit(loadSubAppArg); // [s] [subApp]
                     il.Emit(OpCodes.Ldc_I4, subAppValues[i]); // [s] [subApp] [known subApp]
-                    il.Emit(OpCodes.Ceq);                     // [s] [are equal]
-                    il.Emit(OpCodes.Brfalse, endIfLabel);     // [s]
+                    il.Emit(OpCodes.Ceq); // [s] [are equal]
+                    il.Emit(OpCodes.Brfalse, endIfLabel); // [s]
 
                     // body of if
                     var list = bestDefaults[subApps[i]];
-                    EmitDefaultList(il, list);         // [s]
+                    EmitDefaultList(il, list); // [s]
                     il.Emit(OpCodes.Br, endOfSubApps); // [s]
 
                     il.MarkLabel(endIfLabel);
@@ -820,8 +867,8 @@ namespace NFig
                 if (setting.Group != group)
                 {
                     group = setting.Group;
-                    il.Emit(OpCodes.Pop);     // [s]
-                    il.Emit(OpCodes.Dup);     // [s] [s]
+                    il.Emit(OpCodes.Pop); // [s]
+                    il.Emit(OpCodes.Dup); // [s] [s]
                     EmitLoadGroup(il, group); // [s] [group]
                 }
 
@@ -836,7 +883,8 @@ namespace NFig
             // Initial stack: ... [s]
             // End stack:     ... [group]
 
-            if (group.Parent == null) // there is no parent, so the TSettings object is actually the group object we want, which is what's on the stack already
+            if (group.Parent == null)
+                // there is no parent, so the TSettings object is actually the group object we want, which is what's on the stack already
                 return;
 
             var methodList = new List<MethodInfo>();
@@ -847,7 +895,7 @@ namespace NFig
                 g = g.Parent;
 
             } while (g != null && g.PropertyInfo != null);
-            
+
             // the list was built bottom up, but we need to emit top down, so we go in reverse
             for (var i = methodList.Count - 1; i >= 0; i--)
             {
@@ -869,21 +917,23 @@ namespace NFig
             if (setting.DoNotInlineValues) // we have to call the converter each time
             {
                 var converterType = typeof(ISettingConverter<>).MakeGenericType(typeOfValue);
-                var getValue = converterType.GetMethod(nameof(ISettingConverter<bool>.GetValue)); // the <bool> here really doesn't matter - any type would work
+                var getValue = converterType.GetMethod(nameof(ISettingConverter<bool>.GetValue));
+                    // the <bool> here really doesn't matter - any type would work
 
                 var settingType = typeof(Setting<>).MakeGenericType(typeOfValue);
-                var converterProp = settingType.GetProperty(nameof(Setting<bool>.Converter)); // the <bool> here really doesn't matter - any type would work
+                var converterProp = settingType.GetProperty(nameof(Setting<bool>.Converter));
+                    // the <bool> here really doesn't matter - any type would work
 
                 var settingsField = _reflectionCache.SettingsField;
                 var getSettingItem = _reflectionCache.GetSettingItemMethod;
-                
-                il.Emit(loadFactoryArg);                            // [s] [group] [group] [this]
-                il.Emit(OpCodes.Ldfld, settingsField);              // [s] [group] [group] [_settings]
-                il.Emit(OpCodes.Ldc_I4, settingIndex);              // [s] [group] [group] [_settings] [index]
-                il.Emit(OpCodes.Callvirt, getSettingItem);          // [s] [group] [group] [setting]
+
+                il.Emit(loadFactoryArg); // [s] [group] [group] [this]
+                il.Emit(OpCodes.Ldfld, settingsField); // [s] [group] [group] [_settings]
+                il.Emit(OpCodes.Ldc_I4, settingIndex); // [s] [group] [group] [_settings] [index]
+                il.Emit(OpCodes.Callvirt, getSettingItem); // [s] [group] [group] [setting]
                 il.Emit(OpCodes.Callvirt, converterProp.GetMethod); // [s] [group] [group] [Converter]
-                il.Emit(OpCodes.Ldstr, strValue);                   // [s] [group] [group] [Converter] [strValue]
-                il.Emit(OpCodes.Callvirt, getValue);                // [s] [group] [group] [valueToSet]
+                il.Emit(OpCodes.Ldstr, strValue); // [s] [group] [group] [Converter] [strValue]
+                il.Emit(OpCodes.Callvirt, getValue); // [s] [group] [group] [valueToSet]
             }
             else // we can use a cached value each time
             {
@@ -902,15 +952,15 @@ namespace NFig
                         case InlineStrategy.Cache:
                             var index = AddToValueCache(objValue);
                             var cacheField = _reflectionCache.ValueCacheField;
-                            il.Emit(loadFactoryArg);                     // [s] [group] [group] [this]
-                            il.Emit(OpCodes.Ldfld, cacheField);          // [s] [group] [group] [_valueCache]
-                            il.Emit(OpCodes.Ldc_I4, index);              // [s] [group] [group] [_valueCache] [index]
-                            il.Emit(OpCodes.Ldelem_Ref);                 // [s] [group] [group] [valueToSet]
-                            if (typeOfValue.IsValueType)
+                            il.Emit(loadFactoryArg); // [s] [group] [group] [this]
+                            il.Emit(OpCodes.Ldfld, cacheField); // [s] [group] [group] [_valueCache]
+                            il.Emit(OpCodes.Ldc_I4, index); // [s] [group] [group] [_valueCache] [index]
+                            il.Emit(OpCodes.Ldelem_Ref); // [s] [group] [group] [valueToSet]
+                            if (typeOfValue.IsValueType())
                                 il.Emit(OpCodes.Unbox_Any, typeOfValue); // [s] [group] [group] [unboxed valueToSet]
                             break;
                         case InlineStrategy.String:
-                            il.Emit(OpCodes.Ldstr, (string)objValue); // [s] [group] [group] [valueToSet]
+                            il.Emit(OpCodes.Ldstr, (string) objValue); // [s] [group] [group] [valueToSet]
                             break;
                         case InlineStrategy.Int32:
                             il.Emit(OpCodes.Ldc_I4, Convert.ToInt32(objValue)); // [s] [group] [group] [valueToSet]
@@ -976,10 +1026,10 @@ namespace NFig
             if (type == typeof(string))
                 return InlineStrategy.String;
 
-            if (type.IsEnum)
+            if (type.IsEnum())
                 type = type.GetEnumUnderlyingType();
 
-            if (!type.IsPrimitive)
+            if (!type.IsPrimitive())
                 return InlineStrategy.Cache;
 
             if (type == typeof(bool)
@@ -1005,7 +1055,8 @@ namespace NFig
             if (type == typeof(char))
                 return InlineStrategy.Char;
 
-            return InlineStrategy.Cache; // only other primitive types are IntPtr and UIntPtr (never actually going to happen)
+            return InlineStrategy.Cache;
+                // only other primitive types are IntPtr and UIntPtr (never actually going to happen)
         }
 
         Dictionary<TSubApp, List<BestDefault>> GetBestDefaults()
@@ -1031,7 +1082,8 @@ namespace NFig
                 }
 
                 if (!foundSubApps.Contains(default(TSubApp)))
-                    throw new NFigException($"Setting {s.Name} has no default value for the default sub app. This indicates a bug in NFig.");
+                    throw new NFigException(
+                        $"Setting {s.Name} has no default value for the default sub app. This indicates a bug in NFig.");
 
                 foreach (var subApp in foundSubApps)
                 {
@@ -1062,7 +1114,7 @@ namespace NFig
             var genericType = typeof(ISettingConverter<>);
             foreach (var iface in converter.GetType().GetInterfaces())
             {
-                if (iface.IsGenericType && iface.GetGenericTypeDefinition() == genericType)
+                if (iface.IsGenericType() && iface.GetGenericTypeDefinition() == genericType)
                 {
                     return iface.GenericTypeArguments[0] == type;
                 }
@@ -1127,14 +1179,17 @@ namespace NFig
             }
             catch (Exception ex)
             {
-                var nex = new NFigException("ISettingEncryptor threw an exception during the test encryption/decryption", ex);
+                var nex = new NFigException(
+                    "ISettingEncryptor threw an exception during the test encryption/decryption", ex);
                 nex.Data["original"] = original;
                 throw nex;
             }
 
             if (original != roundTrip)
             {
-                var nex = new NFigException("The provided ISettingEncryptor did not pass the round-trip encryption/decryption test");
+                var nex =
+                    new NFigException(
+                        "The provided ISettingEncryptor did not pass the round-trip encryption/decryption test");
                 nex.Data["original"] = original;
                 nex.Data["roundTrip"] = roundTrip;
                 throw nex;
@@ -1144,36 +1199,36 @@ namespace NFig
         void AssertGenericTypesAreValid()
         {
             var subType = _subAppType;
-            if (subType.IsEnum)
+            if (subType.IsEnum())
                 subType = subType.GetEnumUnderlyingType();
 
             if (!IsValidSubAppType(subType))
                 throw new InvalidOperationException("TSubApp must be an enum or integer (32-bits or smaller).");
 
-            if (!_tierType.IsEnum || !_dataCenterType.IsEnum)
+            if (!_tierType.IsEnum() || !_dataCenterType.IsEnum())
                 throw new InvalidOperationException("TTier and TDataCenter must be enum types.");
         }
 
         static bool IsValidSubAppType(Type type)
         {
             return type == typeof(byte)
-                || type == typeof(sbyte)
-                || type == typeof(short)
-                || type == typeof(ushort)
-                || type == typeof(int)
-                || type == typeof(uint);
+                   || type == typeof(sbyte)
+                   || type == typeof(short)
+                   || type == typeof(ushort)
+                   || type == typeof(int)
+                   || type == typeof(uint);
         }
 
         Func<int, T> GenerateIntToTypeConverter<T>()
         {
             var tType = typeof(T);
-            var dm = new DynamicMethod($"Dynamic:IntToTypeConverter<{tType.Name}>", tType, new[] { typeof(int) });
+            var dm = new DynamicMethod($"Dynamic:IntToTypeConverter<{tType.Name}>", tType, new[] {typeof(int)});
             var il = dm.GetILGenerator();
 
             il.Emit(OpCodes.Ldarg_0);
             il.Emit(OpCodes.Ret);
 
-            return (Func<int, T>)dm.CreateDelegate(typeof(Func<int, T>));
+            return (Func<int, T>) dm.CreateDelegate(typeof(Func<int, T>));
         }
 
         ReflectionCache CreateReflectionCache()
@@ -1182,9 +1237,11 @@ namespace NFig
             var thisType = GetType();
 
             cache.SettingsField = thisType.GetField(nameof(_settings), BindingFlags.NonPublic | BindingFlags.Instance);
-            cache.ValueCacheField = thisType.GetField(nameof(_valueCache), BindingFlags.NonPublic | BindingFlags.Instance);
+            cache.ValueCacheField = thisType.GetField(nameof(_valueCache),
+                BindingFlags.NonPublic | BindingFlags.Instance);
             cache.GetSettingItemMethod = _settings.GetType().GetProperty("Item").GetMethod;
-            cache.PropertyToSettingMethod = thisType.GetMethod(nameof(PropertyToSetting), BindingFlags.NonPublic | BindingFlags.Instance);
+            cache.PropertyToSettingMethod = thisType.GetMethod(nameof(PropertyToSetting),
+                BindingFlags.NonPublic | BindingFlags.Instance);
             cache.PropertyToSettingDelegates = new Dictionary<Type, PropertyToSettingDelegate>();
 
             return cache;
@@ -1197,7 +1254,10 @@ namespace NFig
                 return del;
 
             var methodInfo = _reflectionCache.PropertyToSettingMethod.MakeGenericMethod(type);
-            del = (PropertyToSettingDelegate)Delegate.CreateDelegate(typeof(PropertyToSettingDelegate), this, methodInfo);
+
+            // Delegate.CreateDelegate() doesn't seem to exist in .NET Standard yet. Not sure if there's any better way than calling MethodInfo.Invoke.
+            del = (PropertyInfo pi, SettingAttribute sa, SettingGroup group) => (Setting) methodInfo.Invoke(this, new object[] {pi, sa, group});
+
             _reflectionCache.PropertyToSettingDelegates[type] = del;
 
             return del;
@@ -1208,7 +1268,8 @@ namespace NFig
          * Helper Classes and Delegates
          *************************************************************************************/
 
-        delegate TSettings InitializeSettingsDelegate(SettingsFactory<TSettings, TSubApp, TTier, TDataCenter> factory, TSubApp subApp);
+        delegate TSettings InitializeSettingsDelegate(
+            SettingsFactory<TSettings, TSubApp, TTier, TDataCenter> factory, TSubApp subApp);
 
         delegate void SettingSetterDelegate<TValue>(TSettings settings, TValue value);
 
@@ -1270,7 +1331,10 @@ namespace NFig
             public bool DoNotInlineValues { get; protected set; }
 
             public abstract object GetValueAsObject(TSettings settings);
-            public abstract InvalidSettingValueException TryApplyOverride(TSettings settings, SettingValue<TSubApp, TTier, TDataCenter> over, string strValue);
+
+            public abstract InvalidSettingValueException TryApplyOverride(TSettings settings,
+                SettingValue<TSubApp, TTier, TDataCenter> over, string strValue);
+
             public abstract object GetValueFromString(string str);
             public abstract bool TryGetValueFromString(string str, out object value);
             public abstract bool TryGetStringFromValue(object value, out string str);
@@ -1321,7 +1385,8 @@ namespace NFig
                 return GetValue(settings);
             }
 
-            public override InvalidSettingValueException TryApplyOverride(TSettings settings, SettingValue<TSubApp, TTier, TDataCenter> over, string strValue)
+            public override InvalidSettingValueException TryApplyOverride(TSettings settings,
+                SettingValue<TSubApp, TTier, TDataCenter> over, string strValue)
             {
                 TValue value;
 
@@ -1334,13 +1399,12 @@ namespace NFig
                     var invalidEx = new InvalidSettingValueException(
                         $"Invalid override value for setting \"{Name}\". Cannot convert the string override to a real value.",
                         Name,
-                        over.Value, // intentionally using over.Value here instead of strValue since strValue could be a decrypted value that people don't want in their logs
+                        over.Value,
+                        // intentionally using over.Value here instead of strValue since strValue could be a decrypted value that people don't want in their logs
                         false,
                         over.SubApp.ToString(),
                         over.DataCenter.ToString(),
                         ex);
-
-                    invalidEx.UnthrownStackTrace = new StackTrace(true).ToString();
 
                     return invalidEx;
                 }
@@ -1389,7 +1453,7 @@ namespace NFig
 
             SettingSetterDelegate<TValue> CreateSetterMethod()
             {
-                var dm = new DynamicMethod("AssignSetting_" + Name, null, new[] { typeof(TSettings), TypeOfValue }, GetType().Module, true);
+                var dm = new DynamicMethod("AssignSetting_" + Name, null, new[] { typeof(TSettings), TypeOfValue }, GetType().Module(), true);
                 var il = dm.GetILGenerator();
 
                 // arg 0 = TSettings settings
@@ -1406,7 +1470,7 @@ namespace NFig
 
             SettingGetterDelegate<TValue> CreateGetterMethod()
             {
-                var dm = new DynamicMethod("RetrieveSetting_" + Name, typeof(TValue), new[] { typeof(TSettings) }, GetType().Module, true);
+                var dm = new DynamicMethod("RetrieveSetting_" + Name, typeof(TValue), new[] { typeof(TSettings) }, GetType().Module(), true);
                 var il = dm.GetILGenerator();
 
                 // arg 0 = TSettings settings

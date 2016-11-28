@@ -71,6 +71,7 @@ namespace NFig.Tests
             Assert.AreEqual(17.3, settings.EncryptedDouble);
         }
 
+#if NETFRAMEWORK
         [Test]
         public void RsaEncryption()
         {
@@ -149,6 +150,7 @@ namespace NFig.Tests
             settings = store.GetSettingsForGlobalApp();
             Assert.AreEqual(unencrypted, settings.EncryptedString);
         }
+#endif
 
         // Local for PassThrough testing
         // Dev for Symmetric (AES) testing

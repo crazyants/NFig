@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using System.Reflection;
 
 namespace NFig
 {
@@ -22,7 +23,7 @@ namespace NFig
         {
             // make sure type implements SettingsConverter<>
             var genericType = typeof(ISettingConverter<>);
-            if (!converterType.GetInterfaces().Any(i => i.IsGenericType && i.GetGenericTypeDefinition() == genericType))
+            if (!converterType.GetInterfaces().Any(i => i.IsGenericType() && i.GetGenericTypeDefinition() == genericType))
             {
                 throw new InvalidOperationException($"Cannot use type {converterType.Name} as a setting converter. It does not implement ISettingConverter<T>.");
             }
